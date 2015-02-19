@@ -80,6 +80,8 @@ library
                  , containers
                  , vector
                  , time
+                 -- custom deps
+                 , wai
 
 executable         semeion
     if flag(library-only)

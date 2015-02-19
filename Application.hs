@@ -21,6 +21,7 @@ import Network.Wai.Middleware.RequestLogger (Destination (Logger),
                                              mkRequestLogger, outputFormat)
 import System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet,
                                              toLogStr)
+import Network.Wai.Middleware.HttpAuth
 
 -- Import all relevant handler modules here.
 -- Don't forget to add new modules to your cabal file!
