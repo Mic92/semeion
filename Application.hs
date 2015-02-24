@@ -84,7 +84,7 @@ makeApplication foundation = do
 
     -- Create the WAI application and apply middlewares
     appPlain <- toWaiAppPlain foundation
-    return $ logWare $ defaultMiddlewaresNoLogging appPlain
+    return $ logWare $ basicAuth (\u p -> return $ u == "user" && p == "pass") ("DynDNS" {authIsProtected = \waiRequest -> do return True} :: AuthSettings) $ defaultMiddlewaresNoLogging appPlain
 
 -- | Warp settings for the given foundation value.
 warpSettings :: App -> Settings

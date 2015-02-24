@@ -7,6 +7,7 @@ import System.Process
 import System.Exit
 import Data.Maybe
 import qualified Data.Text as T
+import Data.Text.Encoding  as TE
 import qualified Data.List as L
 import qualified Data.List.Split as LS
 
@@ -23,12 +24,20 @@ getHomeR = do
   hostnames <- case rawHostnames of
     Nothing -> return Nothing
     Just a -> return $ Just $ T.splitOn "," a
-  myip <- case lookupGetParam "myip" of
+  rawMyip <- lookupGetParam "myip"
+  requestIp <- case rawMyip of
+    Nothing -> lookupHeader "x-forwarded-for"
+    Just a  -> return $ Just ("bla" :: ByteString)
+  myip <- case rawMyip of
     Nothing -> do
-      rawIp <- (show . remoteHost . reqWaiRequest) <$> getRequest
+      rawIp <- case requestIp of
+        Nothing ->
+          (show . remoteHost . reqWaiRequest) <$> getRequest
+        Just a ->
+          return $ T.unpack $ TE.decodeUtf8 a
       return $ extractIp rawIp
     Just ip ->
-      return $ T.unpack $ fromJust ip
+      return $ T.unpack ip
   wildcard <- lookupGetParam "wildcard"
   mx <- lookupGetParam "mx"
   backmx <- lookupGetParam "backmx"
@@ -43,13 +52,18 @@ getHomeR = do
         False -> do
           res <- return $ map checkFQDN names
           ans <- return $ map (nsupdate myip) res
-          ans2 <- mapM lift ans
+          ans2 <- sequence ans
           out <- return $ map (\a -> case a of
-            Right True -> do return ("good" :: T.Text)
-            Right False -> do return ("dnserr" :: T.Text)
-            Left x -> do return x
+            Right y -> y >>= return . errNoErr
+            Left x -> return $ x
             ) ans2
-          sendResponse $ T.intercalate "\n" out
+          out2 <- liftIO $ sequence out
+          sendResponse $ T.intercalate "\n" out2
+
+errNoErr x =
+  case x of
+    True -> ("good" :: T.Text)
+    False -> ("dnserr" :: T.Text)
 
 -- checkHostnames :: Maybe [T.Text] -> Either T.Text [T.Text]
 checkhostnames names =
@@ -76,17 +90,17 @@ nsupdate ip res =
     Right name -> 
       return $ Right answer
       where
-        answer = readProcessWithExitCode "/usr/bin/nsupdate" [] ("update add " ++ T.unpack name ++ " 8640 A " ++ ip ++ " \n send") >>= checkDnsErr
+        answer = readProcessWithExitCode "/usr/bin/nsupdate" [] ("update add " ++ T.unpack name ++ " 8640 A " ++ ip ++ " \n send") >>= return . checkDnsErr
 
 extractIpv6 :: String -> String
 extractIpv6 rawIp =
   case '.' `elem` rawIp of
-    False -> L.take (1 + (fromJust $ L.findIndex ( == ']') rawIp)) rawIp
-    True -> drop 8 (fst (L.splitAt (fromJust $ L.findIndex ( == ']') rawIp) rawIp))
+    False -> L.take (1 + (fromMaybe 39 $ L.findIndex ( == ']') rawIp)) rawIp
+    True -> drop 8 (fst (L.splitAt (fromMaybe 12 $ L.findIndex ( == ']') rawIp) rawIp))
 
 extractIpv4 :: String -> String
 extractIpv4 rawIp =
-  fst (L.splitAt (fromJust $ L.findIndex ( == ':') rawIp) rawIp)
+  fst (L.splitAt (fromMaybe 12 $ L.findIndex ( == ':') rawIp) rawIp)
 
 extractIp rawIp =
   case '[' `elem` rawIp of
