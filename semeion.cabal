@@ -82,6 +82,9 @@ library
                  , time
                  -- custom deps
                  , wai
+                 , split
+                 , regex-tdfa
+                 , process
 
 executable         semeion
     if flag(library-only)

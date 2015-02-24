@@ -1,13 +1,2 @@
 <p>
-  Your IP is:
-
-<p>
-  #{ip}
-
-$if user /= Nothing
-  <p>
-    You provided the username #{fromJust user}
-
-$if passwd /= Nothing
-  <p>
-    You provided the password #{fromJust passwd}
+  test
