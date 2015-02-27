@@ -60,23 +60,21 @@ getHomeR = do
           out2 <- liftIO $ sequence out
           sendResponse $ T.intercalate "\n" out2
 
-errNoErr x =
-  case x of
-    True -> ("good" :: T.Text)
-    False -> ("dnserr" :: T.Text)
+errNoErr :: Bool -> Text
+errNoErr x
+  | x == True = ("good" :: T.Text)
+  | otherwise = ("dnserr" :: T.Text)
 
 -- checkHostnames :: Maybe [T.Text] -> Either T.Text [T.Text]
-checkhostnames names =
-  case names of
-    Nothing -> Left "notfqdn"
-    Just list -> case L.length list > 20 of
-      True -> Left "numhosts"
-      False -> Right list
+checkhostnames Nothing = Left "notfqdn"
+checkhostnames (Just list) =
+  case L.length list > 20 of
+    True -> Left "numhosts"
+    False -> Right list
 
-checkDnsErr a =
-  case a of
-    (ExitSuccess, _, _) -> True
-    (ExitFailure _, _, _) -> False
+checkDnsErr :: (ExitCode, t, t1) -> Bool
+checkDnsErr (ExitSuccess, _, _) = True
+checkDnsErr (ExitFailure _, _, _) = False
 
 checkFQDN :: T.Text -> Either T.Text T.Text
 checkFQDN name =
@@ -84,13 +82,11 @@ checkFQDN name =
     False -> Right name
     True -> Left ("notfqdn" :: T.Text)
 
-nsupdate ip res =
-  case res of
-    Left a -> return $ Left a
-    Right name -> 
-      return $ Right answer
-      where
-        answer = readProcessWithExitCode "/usr/bin/nsupdate" [] ("update add " ++ T.unpack name ++ " 8640 A " ++ ip ++ " \n send") >>= return . checkDnsErr
+nsupdate _ (Left a) = return $ Left a
+nsupdate ip (Right name) =
+  return $ Right answer
+  where
+    answer = readProcessWithExitCode "/usr/bin/nsupdate" [] ("update add " ++ T.unpack name ++ " 8640 A " ++ ip ++ " \n send") >>= return . checkDnsErr
 
 extractIpv6 :: String -> String
 extractIpv6 rawIp =
@@ -102,6 +98,7 @@ extractIpv4 :: String -> String
 extractIpv4 rawIp =
   fst (L.splitAt (fromMaybe 12 $ L.findIndex ( == ':') rawIp) rawIp)
 
+extractIp :: String -> String
 extractIp rawIp =
   case '[' `elem` rawIp of
     True -> extractIpv6 rawIp
